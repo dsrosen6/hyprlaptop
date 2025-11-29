@@ -4,10 +4,10 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 const (
@@ -46,7 +46,9 @@ func (c *Conn) Listen() error {
 	sc := bufio.NewScanner(c)
 	for sc.Scan() {
 		line := sc.Text()
-		handleLine(line)
+		if err := handleLine(line); err != nil {
+			fmt.Printf("Error handline line %s: %v\n", line, err)
+		}
 	}
 
 	if err := sc.Err(); err != nil {
@@ -56,9 +58,30 @@ func (c *Conn) Listen() error {
 	return nil
 }
 
-func handleLine(line string) {
-	switch {
-	case strings.HasPrefix(line, "openwindow"):
-		fmt.Println("ayyyyyy da window opened")
+func handleLine(line string) error {
+	event, err := parseBaseEvent(line)
+	if err != nil {
+		return fmt.Errorf("parsing event: %w", err)
 	}
+	slog.Debug("event received", "name", event.Name, "payload", event.Payload)
+	switch event.Name {
+	case "monitoraddedv2":
+		n, err := extractMonitorName(event.Payload)
+		if err != nil {
+			logExtractErr(err)
+		}
+		slog.Debug("got monitor added event", "monitor_name", n)
+	case "monitorremovedv2":
+		n, err := extractMonitorName(event.Payload)
+		if err != nil {
+			logExtractErr(err)
+		}
+		slog.Debug("got monitor removed event", "monitor_name", n)
+	}
+
+	return nil
+}
+
+func logExtractErr(err error) {
+	slog.Error("extracting monitor name from event", "error", err)
 }
