@@ -1,4 +1,4 @@
-package hypr
+package main
 
 import (
 	"fmt"
@@ -6,8 +6,8 @@ import (
 )
 
 type baseEvent struct {
-	Name    string
-	Payload string
+	name    string
+	payload string
 }
 
 func extractMonitorName(payload string) (string, error) {
@@ -26,7 +26,7 @@ func parseBaseEvent(line string) (*baseEvent, error) {
 	}
 
 	return &baseEvent{
-		Name:    parts[0],
-		Payload: parts[1],
+		name:    parts[0],
+		payload: parts[1],
 	}, nil
 }

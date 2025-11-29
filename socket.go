@@ -1,4 +1,4 @@
-package hypr
+package main
 
 import (
 	"bufio"
@@ -17,11 +17,11 @@ const (
 
 var ErrMissingEnvs = errors.New("missing hyprland envs")
 
-type Conn struct {
+type socketConn struct {
 	*net.UnixConn
 }
 
-func NewConn() (*Conn, error) {
+func newConn() (*socketConn, error) {
 	runtime := os.Getenv(runtimeEnv)
 	sig := os.Getenv(sigEnv)
 	if runtime == "" || sig == "" {
@@ -39,10 +39,10 @@ func NewConn() (*Conn, error) {
 		return nil, fmt.Errorf("connecting to socket: %w", err)
 	}
 
-	return &Conn{conn}, nil
+	return &socketConn{conn}, nil
 }
 
-func (c *Conn) Listen() error {
+func (c *socketConn) listen() error {
 	sc := bufio.NewScanner(c)
 	for sc.Scan() {
 		line := sc.Text()
@@ -63,16 +63,16 @@ func handleLine(line string) error {
 	if err != nil {
 		return fmt.Errorf("parsing event: %w", err)
 	}
-	slog.Debug("event received", "name", event.Name, "payload", event.Payload)
-	switch event.Name {
+	slog.Debug("event received", "name", event.name, "payload", event.payload)
+	switch event.name {
 	case "monitoraddedv2":
-		n, err := extractMonitorName(event.Payload)
+		n, err := extractMonitorName(event.payload)
 		if err != nil {
 			logExtractErr(err)
 		}
 		slog.Debug("got monitor added event", "monitor_name", n)
 	case "monitorremovedv2":
-		n, err := extractMonitorName(event.Payload)
+		n, err := extractMonitorName(event.payload)
 		if err != nil {
 			logExtractErr(err)
 		}

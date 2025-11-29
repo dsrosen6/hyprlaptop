@@ -4,40 +4,47 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-
-	"github.com/dsrosen6/hyprlaptop/internal/cfg"
-	"github.com/dsrosen6/hyprlaptop/internal/cli"
-	"github.com/dsrosen6/hyprlaptop/internal/hypr"
 )
 
 func main() {
-	panic(run())
+	if err := run(); err != nil {
+		fmt.Printf("Error: %v\n", err)
+	}
 }
 
 func run() error {
-	opts, err := cli.Parse()
+	opts, err := parseFlags()
 	if err != nil {
 		return fmt.Errorf("parsing cli: %w", err)
 	}
 
-	c, err := cfg.ReadConfig(opts.ConfigFile)
+	c, err := readConfig(opts.configFile)
 	if err != nil {
 		return fmt.Errorf("reading config: %w", err)
 	}
-	slog.Info("config loaded", "primary_monitor", c.PrimaryMonitorName)
+
+	slog.Info("config loaded", "primary_monitor", c.LaptopMonitor.Name)
 
 	if os.Getenv("DEBUG") == "true" {
 		slog.SetLogLoggerLevel(slog.LevelDebug)
 	}
 
-	conn, err := hypr.NewConn()
+	hc, err := newClient()
 	if err != nil {
-		return err
+		return fmt.Errorf("creating hypr client: %w", err)
 	}
 
-	if err := conn.Listen(); err != nil {
+	if err := parseArgs(hc); err != nil {
 		return err
 	}
+	// conn, err := NewConn()
+	// if err != nil {
+	// 	return err
+	// }
+
+	// if err := conn.Listen(); err != nil {
+	// 	return err
+	// }
 
 	return nil
 }

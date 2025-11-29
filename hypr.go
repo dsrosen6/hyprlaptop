@@ -1,5 +1,4 @@
-// Package hypr provides methods to run hyprctl commands.
-package hypr
+package main
 
 import (
 	"bytes"
@@ -15,26 +14,26 @@ const (
 	unknownReqOutput = "unknown request"
 )
 
-type Client struct {
+type client struct {
 	BinaryPath string
 }
 
-var ErrUnknownRequest = errors.New(unknownReqOutput)
+var errUnknownRequest = errors.New(unknownReqOutput)
 
-func NewClient() (*Client, error) {
+func newClient() (*client, error) {
 	bp, err := exec.LookPath(binaryName)
 	if err != nil {
 		return nil, fmt.Errorf("finding full hyprctl binary path: %w", err)
 	}
 
-	return &Client{
+	return &client{
 		BinaryPath: bp,
 	}, nil
 }
 
-func (c *Client) RunCommandWithUnmarshal(args []string, v any) error {
+func (c *client) runCommandWithUnmarshal(args []string, v any) error {
 	a := append([]string{"-j"}, args...)
-	out, err := c.RunCommand(a)
+	out, err := c.runCommand(a)
 	if err != nil {
 		return err
 	}
@@ -46,7 +45,7 @@ func (c *Client) RunCommandWithUnmarshal(args []string, v any) error {
 	return nil
 }
 
-func (c *Client) RunCommand(args []string) ([]byte, error) {
+func (c *client) runCommand(args []string) ([]byte, error) {
 	cmd := exec.Command(c.BinaryPath, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -69,7 +68,7 @@ func checkForErr(out string) error {
 	out = strings.TrimSpace(out)
 	switch out {
 	case unknownReqOutput:
-		return ErrUnknownRequest
+		return errUnknownRequest
 	default:
 		return nil
 	}

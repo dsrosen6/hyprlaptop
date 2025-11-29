@@ -1,5 +1,4 @@
-// Package models contains types/models for hyprlaptop
-package models
+package main
 
 // Monitor matches the output of 'hyprctl monitors', and is also used for config.
 type Monitor struct {

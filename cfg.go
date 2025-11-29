@@ -1,27 +1,25 @@
-// Package cfg handles reading and setting config variables.
-package cfg
+package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
-
-	"github.com/dsrosen6/hyprlaptop/internal/models"
 )
 
-type Config struct {
-	PrimaryMonitorName string           `json:"primary_monitor_name"`
-	Monitors           []models.Monitor `json:"monitors"`
+type config struct {
+	LaptopMonitor    Monitor   `json:"laptop_monitor_name"`
+	ExternalMonitors []Monitor `json:"external_monitors"`
 }
 
-var defaultCfg = &Config{
-	PrimaryMonitorName: "",
-	Monitors:           []models.Monitor{},
+var defaultCfg = &config{
+	LaptopMonitor:    Monitor{},
+	ExternalMonitors: []Monitor{},
 }
 
-func ReadConfig(path string) (*Config, error) {
+func readConfig(path string) (*config, error) {
 	if _, err := os.Stat(path); err != nil {
 		slog.Info("no config file found; creating default")
 		if err := createDefaultFile(path); err != nil {
@@ -34,12 +32,20 @@ func ReadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("reading config file: %w", err)
 	}
 
-	cfg := &Config{}
+	cfg := &config{}
 	if err := json.Unmarshal(file, cfg); err != nil {
 		return nil, fmt.Errorf("unmarshaling json: %w", err)
 	}
 
 	return cfg, nil
+}
+
+func (c *config) validate() error {
+	if c.LaptopMonitor.Name == "" {
+		return errors.New("laptop monitor name not set")
+	}
+
+	return nil
 }
 
 func createDefaultFile(path string) error {
