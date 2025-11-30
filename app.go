@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -12,6 +13,11 @@ type app struct {
 	cfg     *config
 	cfgPath string
 }
+
+var (
+	monitorsCmd = flag.NewFlagSet("save-monitors", flag.ExitOnError)
+	laptopMtr   = monitorsCmd.String("laptop", "", "name of laptop monitor")
+)
 
 func newApp() (*app, error) {
 	if os.Getenv("DEBUG") == "true" {
@@ -45,36 +51,62 @@ func (a *app) run() error {
 	if len(args) < 2 {
 		return errors.New("no subcommand provided")
 	}
-	subCmds := args[1:]
 
-	switch subCmds[0] {
-	case "select-laptop-monitor", "slm":
-		if len(subCmds) != 2 {
-			return fmt.Errorf("set-laptop-monitor: expected 1 argument, got %d", len(subCmds)-1)
-		}
-		name := subCmds[1]
-		if err := a.setLaptopMonitor(name); err != nil {
-			return fmt.Errorf("setting laptop monitor: %w", err)
-		}
-		fmt.Printf("Laptop monitor '%s' saved to config\n", a.cfg.LaptopMonitor.Name)
-
+	switch args[1] {
+	case "save-monitors", "sm":
+		return a.handleSaveMonitors(args[1:])
 	case "listen":
-		sc, err := newSocketConn()
-		if err != nil {
-			return fmt.Errorf("initializing socket connection: %w", err)
-		}
-		defer func() {
-			if err := sc.Close(); err != nil {
-				slog.Error("closing socket connection", "error", err)
-			}
-		}()
-
-		slog.Info("listening for hyprland events")
-		if err := a.listen(sc); err != nil {
-			return err
-		}
+		return a.handleListen()
 	default:
 		return errors.New("invalid command")
 	}
+}
+
+func (a *app) handleSaveMonitors(args []string) error {
+	expectedArgs := 1
+	gotArgs := len(args) - 1
+	if gotArgs != expectedArgs {
+		return fmt.Errorf("expected %d arguments, got %d", expectedArgs, gotArgs)
+	}
+
+	if err := monitorsCmd.Parse(args[1:]); err != nil {
+		return fmt.Errorf("parsing arguments: %w", err)
+	}
+
+	if err := a.saveCurrentMonitors(*laptopMtr); err != nil {
+		return fmt.Errorf("setting laptop monitor: %w", err)
+	}
+
+	fmt.Printf("Laptop monitor '%s' saved to config.\n", a.cfg.LaptopMonitor.Name)
+	externals := a.cfg.ExternalMonitors
+	switch len(externals) {
+	case 0:
+		fmt.Println("No external monitors detected.")
+	default:
+		fmt.Println("Saved external monitor(s):")
+		for _, e := range externals {
+			fmt.Printf("	%s\n", e.Name)
+		}
+	}
+
+	return nil
+}
+
+func (a *app) handleListen() error {
+	sc, err := newSocketConn()
+	if err != nil {
+		return fmt.Errorf("initializing socket connection: %w", err)
+	}
+	defer func() {
+		if err := sc.Close(); err != nil {
+			slog.Error("closing socket connection", "error", err)
+		}
+	}()
+
+	slog.Info("listening for hyprland events")
+	if err := a.listen(sc); err != nil {
+		return err
+	}
+
 	return nil
 }

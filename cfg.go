@@ -11,15 +11,15 @@ import (
 
 type config struct {
 	path             string
-	LaptopMonitor    Monitor   `json:"laptop_monitor_name"`
-	ExternalMonitors []Monitor `json:"external_monitors"`
+	LaptopMonitor    Monitor            `json:"laptop_monitor_name"`
+	ExternalMonitors map[string]Monitor `json:"external_monitors"`
 }
 
 func defaultCfg(path string) *config {
 	return &config{
 		path:             path,
 		LaptopMonitor:    Monitor{},
-		ExternalMonitors: []Monitor{},
+		ExternalMonitors: map[string]Monitor{},
 	}
 }
 
