@@ -4,23 +4,27 @@ import (
 	"fmt"
 )
 
-type Monitor struct {
-	Name        string  `json:"name"`
-	Width       int64   `json:"width"`
-	Height      int64   `json:"height"`
-	RefreshRate float64 `json:"refreshRate"`
-	X           int64   `json:"x"`
-	Y           int64   `json:"y"`
-	Scale       float64 `json:"scale"`
-}
+type (
+	Monitor struct {
+		Name        string  `json:"name"`
+		Width       int64   `json:"width"`
+		Height      int64   `json:"height"`
+		RefreshRate float64 `json:"refreshRate"`
+		X           int64   `json:"x"`
+		Y           int64   `json:"y"`
+		Scale       float64 `json:"scale"`
+	}
 
-func (h *HyprctlClient) ListMonitors() (map[string]Monitor, error) {
+	MonitorMap map[string]Monitor
+)
+
+func (h *HyprctlClient) ListMonitors() (MonitorMap, error) {
 	var monitors []Monitor
 	if err := h.RunCommandWithUnmarshal([]string{"monitors"}, &monitors); err != nil {
 		return nil, err
 	}
 
-	mm := make(map[string]Monitor, len(monitors))
+	mm := make(MonitorMap, len(monitors))
 	for _, m := range monitors {
 		mm[m.Name] = m
 	}

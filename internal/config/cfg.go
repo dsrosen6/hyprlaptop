@@ -19,7 +19,7 @@ const (
 
 type Config struct {
 	path             string
-	LaptopMonitor    hypr.Monitor            `json:"laptop_monitor_name"`
+	LaptopMonitor    hypr.Monitor            `json:"laptop_monitor"`
 	ExternalMonitors map[string]hypr.Monitor `json:"external_monitors"`
 }
 

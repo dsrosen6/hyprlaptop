@@ -2,13 +2,24 @@ package app
 
 import (
 	"fmt"
+	"log/slog"
+	"os"
 	"testing"
 
 	"github.com/dsrosen6/hyprlaptop/internal/config"
 	"github.com/dsrosen6/hyprlaptop/internal/hypr"
 )
 
+func TestNewClient(t *testing.T) {
+	if _, err := newTestApp(t); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRun(t *testing.T) {
+	if os.Getenv("DEBUG") == "true" {
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+	}
 	a, err := newTestApp(t)
 	if err != nil {
 		t.Fatalf("creating app: %v", err)
