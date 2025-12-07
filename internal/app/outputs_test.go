@@ -25,7 +25,7 @@ func TestRun(t *testing.T) {
 		t.Fatalf("creating app: %v", err)
 	}
 
-	if err := a.Run(); err != nil {
+	if err := a.Run(nil); err != nil {
 		t.Fatal(err)
 	}
 }

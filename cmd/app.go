@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -18,6 +19,7 @@ var (
 )
 
 func Run() error {
+	ctx := context.Background()
 	if err := parseFlags(); err != nil {
 		return fmt.Errorf("parsing cli flags: %w", err)
 	}
@@ -33,14 +35,14 @@ func Run() error {
 	}
 
 	a := app.NewApp(cfg, hc)
-	if err := handleCommands(a); err != nil {
+	if err := handleCommands(ctx, a); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func handleCommands(a *app.App) error {
+func handleCommands(ctx context.Context, a *app.App) error {
 	args := os.Args[1:]
 	if len(args) == 0 {
 		return errors.New("no subcommand provided")
@@ -50,7 +52,7 @@ func handleCommands(a *app.App) error {
 	case "save-displays", "sd":
 		return handleSaveDisplays(a, args)
 	case "listen":
-		return handleListen(a)
+		return handleListen(ctx, a)
 	default:
 		return errors.New("invalid command")
 	}
@@ -86,22 +88,10 @@ func handleSaveDisplays(a *app.App, args []string) error {
 	return nil
 }
 
-func handleListen(a *app.App) error {
+func handleListen(ctx context.Context, a *app.App) error {
 	slog.Info("initializing socket connection")
-	sc, err := hypr.NewSocketConn()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := sc.Close(); err != nil {
-			slog.Error("error closing socket connection", "error", err)
-			return
-		}
-		slog.Info("socket connection closed")
-	}()
-
 	slog.Info("listening for hyprland events")
-	if err := sc.ListenForEvents(); err != nil {
+	if err := a.Listen(ctx); err != nil {
 		return err
 	}
 
