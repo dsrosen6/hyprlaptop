@@ -2,8 +2,6 @@ package app
 
 import (
 	"fmt"
-	"log/slog"
-	"os"
 	"strings"
 
 	"github.com/dsrosen6/hyprlaptop/internal/config"
@@ -16,10 +14,6 @@ type App struct {
 }
 
 func NewApp(cfg *config.Config, hc *hypr.HyprctlClient) *App {
-	if os.Getenv("DEBUG") == "true" {
-		slog.SetLogLoggerLevel(slog.LevelDebug)
-	}
-
 	return &App{
 		Hctl: hc,
 		Cfg:  cfg,

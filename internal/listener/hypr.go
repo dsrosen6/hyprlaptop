@@ -20,21 +20,21 @@ func (l *Listener) ListenHyprctl(ctx context.Context, events chan<- Event) error
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
+
+			line := scn.Text()
+
+			ev, err := parseDisplayEvent(line)
+			if err != nil {
+				slog.Error("parse error", "err", err)
+				continue
+			}
+
+			if ev.Type == DisplayUnknownEvent {
+				continue
+			}
+
+			events <- ev
 		}
-
-		line := scn.Text()
-
-		ev, err := parseDisplayEvent(line)
-		if err != nil {
-			slog.Error("parse error", "err", err)
-			continue
-		}
-
-		if ev.Type == DisplayUnknownEvent {
-			continue
-		}
-
-		events <- ev
 	}
 
 	if err := scn.Err(); err != nil {

@@ -10,15 +10,17 @@ import (
 
 type Listener struct {
 	hctlSocketConn *hypr.SocketConn
+	cfgPath        string
 }
 
-func NewListener(hctlSocketConn *hypr.SocketConn) *Listener {
+func NewListener(hctlSocketConn *hypr.SocketConn, cfgPath string) *Listener {
 	return &Listener{
 		hctlSocketConn: hctlSocketConn,
+		cfgPath:        cfgPath,
 	}
 }
 
-func ListenForEvents(ctx context.Context, events chan<- Event) error {
+func ListenForEvents(ctx context.Context, cfgPath string, events chan<- Event) error {
 	sc, err := hypr.NewSocketConn()
 	if err != nil {
 		return fmt.Errorf("creating hyprland socket connection: %w", err)
@@ -30,7 +32,7 @@ func ListenForEvents(ctx context.Context, events chan<- Event) error {
 		}
 	}()
 
-	l := NewListener(sc)
+	l := NewListener(sc, cfgPath)
 	return l.listenForEvents(ctx, events)
 }
 
@@ -48,10 +50,16 @@ func (l *Listener) listenForEvents(ctx context.Context, events chan<- Event) err
 		}
 	}()
 
+	go func() {
+		if err := l.listenForConfigChanges(ctx, events); err != nil {
+			errc <- fmt.Errorf("config listener: %w", err)
+		}
+	}()
+
 	select {
-	case err := <-errc:
-		return err
 	case <-ctx.Done():
 		return ctx.Err()
+	case err := <-errc:
+		return err
 	}
 }

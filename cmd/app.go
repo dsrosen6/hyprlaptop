@@ -25,10 +25,15 @@ func Run() error {
 		return fmt.Errorf("parsing cli flags: %w", err)
 	}
 
+	if os.Getenv("DEBUG") == "true" {
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+	}
+
 	cfg, err := config.InitConfig(cfgFile)
 	if err != nil {
 		return fmt.Errorf("reading config: %w", err)
 	}
+	slog.Debug("initiated config", "path", cfg.Path)
 
 	hc, err := hypr.NewHyprctlClient()
 	if err != nil {

@@ -16,7 +16,7 @@ func (a *App) Listen(ctx context.Context) error {
 	errc := make(chan error, 1)
 
 	go func() {
-		if err := listener.ListenForEvents(ctx, events); err != nil {
+		if err := listener.ListenForEvents(ctx, a.Cfg.Path, events); err != nil {
 			errc <- err
 			cancel()
 		}
@@ -28,9 +28,24 @@ func (a *App) Listen(ctx context.Context) error {
 			if !ok {
 				return nil // normal shutdown
 			}
+
 			slog.Info("received event from listener", "type", ev.Type, "details", ev.Details)
-			if err := a.Run(); err != nil {
-				slog.Error("error running display updater", "error", err)
+			switch ev.Type {
+			case listener.DisplayAddEvent, listener.DisplayRemoveEvent, listener.DisplayUnknownEvent:
+				if err := a.Run(); err != nil {
+					slog.Error("running display updater", "error", err)
+				}
+			case listener.ConfigUpdatedEvent:
+				// Update config values
+				err := a.Cfg.Reload(5)
+				if err != nil {
+					slog.Error("reloading config", "error", err)
+				} else {
+					// Run displayer updater in case changes are needed from new config values
+					if err := a.Run(); err != nil {
+						slog.Error("running display updater (config change)", "error", err)
+					}
+				}
 			}
 
 		case err := <-errc:
