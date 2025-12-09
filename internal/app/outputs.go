@@ -8,14 +8,13 @@ import (
 	"sync"
 
 	"github.com/dsrosen6/hyprlaptop/internal/hypr"
-	"github.com/dsrosen6/hyprlaptop/internal/lid"
 )
 
 type (
 	getOutputResult struct {
 		laptopName string
 		displays   hypr.MonitorMap
-		lidState   lid.State
+		lidState   lidState
 	}
 
 	outputsStatus string
@@ -71,7 +70,7 @@ func (a *App) getOutputs() (*getOutputResult, error) {
 	}
 	slog.Info("displays detected", "names", strings.Join(names, ","))
 
-	ls, err := lid.GetState()
+	ls, err := getLidState()
 	if err != nil {
 		return nil, fmt.Errorf("getting lid status: %w", err)
 	}
@@ -156,26 +155,26 @@ func (o *getOutputResult) statusShouldBe() outputsStatus {
 	return withExternalStates(o.lidState)
 }
 
-func onlyLaptopStates(ls lid.State) outputsStatus {
+func onlyLaptopStates(ls lidState) outputsStatus {
 	switch ls {
-	case lid.StateOpen:
+	case lidStateOpen:
 		return statusOLLO
-	case lid.StateClosed:
+	case lidStateClosed:
 		return statusOLLC
-	case lid.StateUnknown:
+	case lidStateUnknown:
 		return statusUnknown
 	default:
 		return statusUnknown
 	}
 }
 
-func withExternalStates(ls lid.State) outputsStatus {
+func withExternalStates(ls lidState) outputsStatus {
 	switch ls {
-	case lid.StateOpen:
+	case lidStateOpen:
 		return statusWELO
-	case lid.StateClosed:
+	case lidStateClosed:
 		return statusWELC
-	case lid.StateUnknown:
+	case lidStateUnknown:
 		return statusUnknown
 	default:
 		return statusUnknown
