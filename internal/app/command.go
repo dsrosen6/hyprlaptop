@@ -13,6 +13,10 @@ func SendLidCommand() error {
 	return sendCommand(string(listener.LidSwitchEvent))
 }
 
+func SendWakeCommand() error {
+	return sendCommand(string(listener.IdleWakeEvent))
+}
+
 func sendCommand(msg string) error {
 	sock := filepath.Join(os.TempDir(), listener.CommandSockName)
 

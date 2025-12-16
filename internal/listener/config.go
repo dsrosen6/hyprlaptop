@@ -11,6 +11,8 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
+// listenForConfig changes listens for changes in the config file; if a change is detected,
+// hyprlaptop performs a live reload.
 func (l *Listener) listenForConfigChanges(ctx context.Context, events chan<- Event) error {
 	var lastHash [32]byte
 

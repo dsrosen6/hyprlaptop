@@ -19,6 +19,8 @@ var (
 	mtrName        = saveDiplaysCmd.String("laptop", "", "name of laptop display")
 )
 
+// Run is the primary entry point of hyprlaptop. It is used both to launch the listener
+// and to handle CLI commands.
 func Run() error {
 	ctx := context.Background()
 	if err := parseFlags(); err != nil {
@@ -48,6 +50,7 @@ func Run() error {
 	return nil
 }
 
+// handleCommands parses and handles CLI options.
 func handleCommands(ctx context.Context, args []string) error {
 	if len(args) == 0 {
 		return handleRefresh()
@@ -58,6 +61,8 @@ func handleCommands(ctx context.Context, args []string) error {
 		return handleSaveDisplays(args)
 	case "lid", "lid-switch":
 		return handleLidSwitch()
+	case "wake":
+		return handleWake()
 	case "listen":
 		return handleListen(ctx)
 	default:
@@ -65,6 +70,8 @@ func handleCommands(ctx context.Context, args []string) error {
 	}
 }
 
+// handleRefresh runs a regular refresh of hyprlaptop if no subcommands
+// are passed. It is a manual or catchall run.
 func handleRefresh() error {
 	if err := a.Run(); err != nil {
 		return fmt.Errorf("refreshing: %w", err)
@@ -73,6 +80,9 @@ func handleRefresh() error {
 	return nil
 }
 
+// handleSaveDisplays saves the current arrangement of displays into the config,
+// essentially freezing the setup state for future runs. This is a way around
+// manually inputting your config.
 func handleSaveDisplays(args []string) error {
 	expectedArgs := 1
 	gotArgs := len(args) - 1
@@ -103,6 +113,7 @@ func handleSaveDisplays(args []string) error {
 	return nil
 }
 
+// handleLidSwitch handles the lid switch; meant to be wired up to binds in hyprland.
 func handleLidSwitch() error {
 	if err := app.SendLidCommand(); err != nil {
 		return fmt.Errorf("sending lid switch command: %w", err)
@@ -111,6 +122,19 @@ func handleLidSwitch() error {
 	return nil
 }
 
+// handleWake handles wake from suspend; meant to be put into "after_sleep_cmd" in hypridle.
+// This handles situations where, perhaps, you shut your laptop (suspending it) and then
+// it is plugged into a dock. Otherwise, it would wake with the laptop display on while it is shut.
+func handleWake() error {
+	if err := app.SendWakeCommand(); err != nil {
+		return fmt.Errorf("sending wake command: %w", err)
+	}
+
+	return nil
+}
+
+// handleListen is the entry point to the listener; meant to be run as a systemd user unit
+// or as an exec-once in hyprland, depending on if you're using UWSM.
 func handleListen(ctx context.Context) error {
 	slog.Info("initializing socket connection")
 	slog.Info("listening for hyprland events")

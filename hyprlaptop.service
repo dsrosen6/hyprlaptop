@@ -3,7 +3,7 @@ Description=Hyprlaptop Listener
 After=graphical-session.target
 
 [Service]
-ExecStart=/home/danny/go/bin/hyprlaptop listen
+ExecStart=hyprlaptop listen
 Restart=on-failure
 RestartSec=2
 

@@ -14,6 +14,7 @@ const (
 
 var cfgFile string
 
+// parseFlags parses command line flags (currently just config path override)
 func parseFlags() error {
 	flag.StringVar(&cfgFile, "c", "", "specify a config file")
 	flag.Parse()

@@ -13,6 +13,8 @@ import (
 
 var CommandSockName = "hyprlaptop.sock"
 
+// commandListener listens for CLI-specific commands besides "listen" and performs
+// actions when required.
 func (l *Listener) commandListener(ctx context.Context, events chan<- Event) error {
 	sock := filepath.Join(os.TempDir(), CommandSockName)
 
@@ -55,6 +57,10 @@ func (l *Listener) commandListener(ctx context.Context, events chan<- Event) err
 				switch msg {
 				case string(LidSwitchEvent):
 					events <- Event{Type: LidSwitchEvent}
+				case string(IdleWakeEvent):
+					events <- Event{Type: IdleWakeEvent}
+				case string(DisplayUnknownEvent):
+					events <- Event{Type: DisplayUnknownEvent}
 				default:
 					slog.Warn("command listener: got unknown message", "msg", msg)
 				}

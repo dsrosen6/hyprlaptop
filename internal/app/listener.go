@@ -8,6 +8,8 @@ import (
 	"github.com/dsrosen6/hyprlaptop/internal/listener"
 )
 
+// Listen starts hyprlaptop's listener, which handles hyprctl display add/remove events
+// and events from the hyprlaptop CLI.
 func (a *App) Listen(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -31,7 +33,10 @@ func (a *App) Listen(ctx context.Context) error {
 
 			slog.Info("received event from listener", "type", ev.Type, "details", ev.Details)
 			switch ev.Type {
-			case listener.DisplayAddEvent, listener.DisplayRemoveEvent, listener.DisplayUnknownEvent, listener.LidSwitchEvent:
+			// All of these do the same thing. They are separate events for logging and for potential
+			// logic if they need to do different things in the future.
+			case listener.DisplayAddEvent, listener.DisplayRemoveEvent, listener.LidSwitchEvent,
+				listener.IdleWakeEvent, listener.DisplayUnknownEvent:
 				if err := a.Run(); err != nil {
 					slog.Error("running display updater", "error", err)
 				}
