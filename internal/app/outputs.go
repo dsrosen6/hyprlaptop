@@ -35,7 +35,7 @@ func (a *App) Run() error {
 	}
 
 	s := o.statusShouldBe()
-	slog.Debug(fmt.Sprintf("status should be: %s", s))
+	slog.Info(fmt.Sprintf("status received: %s", s))
 
 	payloads := a.createPayloads(o, s)
 	needUpdate := false

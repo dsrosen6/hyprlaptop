@@ -13,6 +13,10 @@ import (
 	"github.com/dsrosen6/hyprlaptop/internal/hypr"
 )
 
+const (
+	version = "0.1.1"
+)
+
 var (
 	a              *app.App
 	saveDiplaysCmd = flag.NewFlagSet("save-displays", flag.ExitOnError)
@@ -57,6 +61,9 @@ func handleCommands(ctx context.Context, args []string) error {
 	}
 
 	switch args[0] {
+	case "version":
+		fmt.Println(version)
+		return nil
 	case "save-displays", "sd":
 		return handleSaveDisplays(args)
 	case "lid", "lid-switch":

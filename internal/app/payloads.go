@@ -21,7 +21,7 @@ func (a *App) createPayloads(o *getOutputResult, status outputsStatus) []display
 	case statusWELO:
 		enableLaptop = true
 		enableExternals = true
-	case statusOLLO:
+	case statusOLLO, statusOLLC:
 		enableLaptop = true
 	case statusWELC:
 		enableExternals = true
