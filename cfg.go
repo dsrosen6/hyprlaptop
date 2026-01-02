@@ -1,5 +1,4 @@
-// Package config handles all configuration logic for hyprlaptop.
-package config
+package main
 
 import (
 	"encoding/json"
@@ -17,34 +16,23 @@ const (
 )
 
 type (
-	Config struct {
+	config struct {
 		path     string
+		Monitors map[string]monitorConfig
 		Profiles []Profile `json:"profiles"`
 	}
 
-	Profile struct {
-		Name       string                        `json:"name,omitempty"`
-		Monitors   map[string]MonitorIdentifiers `json:"monitors,omitempty"`
-		LidState   *string                       `json:"lid,omitempty"`
-		PowerState *string                       `json:"power,omitempty"`
-	}
-
-	MonitorIdentifiers struct {
-		Name        *string `json:"name,omitempty"`
-		Description *string `json:"description,omitempty"`
-		Make        *string `json:"make,omitempty"`
-		Model       *string `json:"model,omitempty"`
-	}
+	monitorConfig struct{}
 )
 
-func defaultCfg(path string) *Config {
-	return &Config{
+func defaultCfg(path string) *config {
+	return &config{
 		path:     path,
 		Profiles: []Profile{},
 	}
 }
 
-func InitConfig(path string) (*Config, error) {
+func InitConfig(path string) (*config, error) {
 	uc, err := os.UserConfigDir()
 	if err != nil {
 		return nil, fmt.Errorf("getting user config directory path: %w", err)
@@ -58,11 +46,11 @@ func InitConfig(path string) (*Config, error) {
 	return readConfig(path, true)
 }
 
-func (c *Config) Path() string {
+func (c *config) Path() string {
 	return c.path
 }
 
-func (c *Config) Reload(maxRetries int) error {
+func (c *config) Reload(maxRetries int) error {
 	u, err := readConfigWithRetry(c.path, maxRetries)
 	if err != nil {
 		return fmt.Errorf("reading config: %w", err)
@@ -74,7 +62,7 @@ func (c *Config) Reload(maxRetries int) error {
 	return nil
 }
 
-func (c *Config) Write() error {
+func (c *config) Write() error {
 	dir := filepath.Dir(c.path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("checking and/or creating config directory: %w", err)
@@ -92,8 +80,8 @@ func (c *Config) Write() error {
 	return nil
 }
 
-func readConfig(path string, createDefault bool) (*Config, error) {
-	cfg := &Config{}
+func readConfig(path string, createDefault bool) (*config, error) {
+	cfg := &config{}
 	if _, err := os.Stat(path); err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("stat config file: %w", err)
@@ -123,7 +111,7 @@ func readConfig(path string, createDefault bool) (*Config, error) {
 	return cfg, nil
 }
 
-func readConfigWithRetry(path string, maxRetries int) (*Config, error) {
+func readConfigWithRetry(path string, maxRetries int) (*config, error) {
 	var lastErr error
 
 	for i := range maxRetries {

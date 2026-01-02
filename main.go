@@ -1,15 +1,9 @@
 package main
 
-import (
-	"fmt"
-	"os"
-
-	"github.com/dsrosen6/hyprlaptop/cmd"
-)
+import "fmt"
 
 func main() {
-	if err := cmd.Run(); err != nil {
+	if err := Run(); err != nil {
 		fmt.Println("Error:", err)
-		os.Exit(1)
 	}
 }
