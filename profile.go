@@ -1,29 +1,28 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
-	"strings"
 )
 
 type (
 	profile struct {
-		Name          string         `json:"name"`
-		Conditions    conditions     `json:"conditions"`
-		MonitorStates []monitorState `json:"monitor_states"`
-		valid         bool
+		Name              string         `json:"name"`
+		Conditions        conditions     `json:"conditions"`
+		MonitorStates     []monitorState `json:"monitor_states"`
+		DisableUndeclared bool           `json:"disable_undeclared_monitors"`
+		valid             bool
 	}
 
 	conditions struct {
-		LidState         *lidState   `json:"lid_state"`
-		PowerState       *powerState `json:"power_state"`
-		EnabledMonitors  []string    `json:"enabled_monitors"`
-		DisabledMonitors []string    `json:"disabled_monitors"`
+		LidState        *lidState   `json:"lid_state"`
+		PowerState      *powerState `json:"power_state"`
+		EnabledMonitors []string    `json:"enabled_monitors"`
 	}
 
 	monitorState struct {
-		Label  string `json:"label"`
-		Preset string `json:"preset"`
+		Label    string  `json:"label"`
+		Disabled bool    `json:"disabled"`
+		Preset   *string `json:"preset"`
 	}
 )
 
@@ -34,74 +33,52 @@ func (a *app) validateAllProfiles() {
 }
 
 func (a *app) validateProfile(p *profile) {
-	var invalidReasons []string
+	valid := true
+	pLog := slog.Default().With(slog.String("profile_name", p.Name))
 	if p.Conditions.LidState != nil {
 		parsed := parseLidState(string(*p.Conditions.LidState))
 		if parsed == lidStateUnknown {
-			invalidReasons = append(invalidReasons, "lid state")
+			valid = false
+			pLog.Warn("invalid condition: lid state")
 		}
 	}
 
 	if p.Conditions.PowerState != nil {
 		parsed := parsePowerState(string(*p.Conditions.PowerState))
 		if parsed == powerStateUnknown {
-			invalidReasons = append(invalidReasons, "power state")
+			pLog.Warn("invalid condition: power state")
 		}
 	}
 
-	var invalidEnabled []string
 	for _, m := range p.Conditions.EnabledMonitors {
 		if !a.validMonitorLabel(m) {
-			invalidEnabled = append(invalidEnabled, m)
+			valid = false
+			pLog.Warn("invalid condition: enabled monitor", "label", m)
 		}
 	}
 
-	var invalidDisabled []string
-	for _, m := range p.Conditions.DisabledMonitors {
-		if !a.validMonitorLabel(m) {
-			invalidDisabled = append(invalidDisabled, m)
-		}
-	}
-
-	var invalidStateLabels, invalidStatePresets []string
 	for _, s := range p.MonitorStates {
 		if !a.validMonitorLabel(s.Label) {
-			invalidStateLabels = append(invalidStateLabels, s.Label)
+			valid = false
+			pLog.Warn("invalid monitor state", "label", s.Label, "reason", "label not found")
 			continue
 		}
 
-		if !a.validMonitorPreset(s.Label, s.Preset) {
-			invalidStatePresets = append(invalidStatePresets, fmt.Sprintf("%s:%s", s.Label, s.Preset))
+		if s.Preset != nil {
+			if s.Disabled {
+				valid = false
+				pLog.Warn("invalid monitor state", "label", s.Label, "reason", "conflict: disabled set to true, but preset declared")
+				continue
+			}
+
+			if !a.validMonitorPreset(s.Label, *s.Preset) {
+				valid = false
+				pLog.Warn("invalid monitor state", "label", s.Label, "reason", "preset not found", "preset", *s.Preset)
+			}
 		}
 	}
 
-	if len(invalidEnabled) > 0 {
-		s := fmt.Sprintf("enabled monitor conditions: [%s]", strings.Join(invalidEnabled, ","))
-		invalidReasons = append(invalidReasons, s)
-	}
-
-	if len(invalidDisabled) > 0 {
-		s := fmt.Sprintf("disabled monitor conditions: [%s]", strings.Join(invalidDisabled, ","))
-		invalidReasons = append(invalidReasons, s)
-	}
-
-	if len(invalidStateLabels) > 0 {
-		s := fmt.Sprintf("monitor state labels: [%s]", strings.Join(invalidStateLabels, ","))
-		invalidReasons = append(invalidReasons, s)
-	}
-
-	if len(invalidStatePresets) > 0 {
-		s := fmt.Sprintf("monitor preset labels: [%s]", strings.Join(invalidStatePresets, ","))
-		invalidReasons = append(invalidReasons, s)
-	}
-
-	if len(invalidReasons) > 0 {
-		slog.Warn("profile invalid", "name", p.Name, "invalid_reasons", strings.Join(invalidReasons, ", "))
-		p.valid = false
-		return
-	}
-
-	p.valid = true
+	p.valid = valid
 }
 
 func (a *app) validMonitorLabel(label string) bool {
