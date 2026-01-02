@@ -57,87 +57,16 @@ func Run() error {
 // handleCommands parses and handles CLI options.
 func handleCommands(ctx context.Context, args []string) error {
 	if len(args) == 0 {
-		return handleRefresh()
+		return handleListen(ctx)
 	}
 
 	switch args[0] {
 	case "version":
 		fmt.Println(version)
 		return nil
-	case "save-displays", "sd":
-		return handleSaveDisplays(args)
-	case "lid", "lid-switch":
-		return handleLidSwitch()
-	case "wake":
-		return handleWake()
-	case "listen":
-		return handleListen(ctx)
 	default:
 		return errors.New("invalid command")
 	}
-}
-
-// handleRefresh runs a regular refresh of hyprlaptop if no subcommands
-// are passed. It is a manual or catchall run.
-func handleRefresh() error {
-	if err := a.Run(); err != nil {
-		return fmt.Errorf("refreshing: %w", err)
-	}
-
-	return nil
-}
-
-// handleSaveDisplays saves the current arrangement of displays into the config,
-// essentially freezing the setup state for future runs. This is a way around
-// manually inputting your config.
-func handleSaveDisplays(args []string) error {
-	expectedArgs := 1
-	gotArgs := len(args) - 1
-	if gotArgs != expectedArgs {
-		return fmt.Errorf("expected %d arguments, got %d", expectedArgs, gotArgs)
-	}
-
-	if err := saveDiplaysCmd.Parse(args[1:]); err != nil {
-		return fmt.Errorf("parsing arguments: %w", err)
-	}
-
-	if err := a.SaveCurrentDisplays(*mtrName); err != nil {
-		return fmt.Errorf("setting laptop display: %w", err)
-	}
-
-	fmt.Printf("Laptop display '%s' saved to config.\n", a.Cfg.LaptopDisplay.Name)
-	externals := a.Cfg.ExternalDisplays
-	switch len(externals) {
-	case 0:
-		fmt.Println("No external display detected.")
-	default:
-		fmt.Println("Saved external display(s):")
-		for _, e := range externals {
-			fmt.Printf("	%s\n", e.Name)
-		}
-	}
-
-	return nil
-}
-
-// handleLidSwitch handles the lid switch; meant to be wired up to binds in hyprland.
-func handleLidSwitch() error {
-	if err := app.SendLidCommand(); err != nil {
-		return fmt.Errorf("sending lid switch command: %w", err)
-	}
-
-	return nil
-}
-
-// handleWake handles wake from suspend; meant to be put into "after_sleep_cmd" in hypridle.
-// This handles situations where, perhaps, you shut your laptop (suspending it) and then
-// it is plugged into a dock. Otherwise, it would wake with the laptop display on while it is shut.
-func handleWake() error {
-	if err := app.SendWakeCommand(); err != nil {
-		return fmt.Errorf("sending wake command: %w", err)
-	}
-
-	return nil
 }
 
 // handleListen is the entry point to the listener; meant to be run as a systemd user unit

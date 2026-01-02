@@ -7,6 +7,9 @@ import (
 type (
 	Monitor struct {
 		Name        string  `json:"name,omitempty"`
+		Description string  `json:"description,omitempty"`
+		Make        string  `json:"make,omitempty"`
+		Model       string  `json:"model,omitempty"`
 		Width       int64   `json:"width,omitempty"`
 		Height      int64   `json:"height,omitempty"`
 		RefreshRate float64 `json:"refreshRate,omitempty"`

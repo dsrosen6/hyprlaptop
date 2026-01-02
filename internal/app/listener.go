@@ -56,7 +56,7 @@ func (a *App) Listen(ctx context.Context) error {
 				continue
 			}
 
-			if err := a.Run(); err != nil {
+			if err := a.RunUpdater(); err != nil {
 				slog.Error("running updater", "error", err)
 			}
 

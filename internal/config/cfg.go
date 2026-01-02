@@ -9,8 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-
-	"github.com/dsrosen6/hyprlaptop/internal/hypr"
 )
 
 const (
@@ -18,17 +16,30 @@ const (
 	cfgFileName = "hyprlaptop.json"
 )
 
-type Config struct {
-	path             string
-	LaptopDisplay    hypr.Monitor            `json:"laptop_display"`
-	ExternalDisplays map[string]hypr.Monitor `json:"external_displays"`
-}
+type (
+	Config struct {
+		path     string
+		Profiles []Profile `json:"profiles"`
+	}
+
+	Profile struct {
+		Monitors   map[string]MonitorIdentifiers `json:"monitors,omitempty"`
+		LidState   string                        `json:"lid_state,omitempty"`
+		PowerState string                        `json:"power_state,omitempty"`
+	}
+
+	MonitorIdentifiers struct {
+		Name        string `json:"name,omitempty"`
+		Description string `json:"description,omitempty"`
+		Make        string `json:"make,omitempty"`
+		Model       string `json:"model,omitempty"`
+	}
+)
 
 func defaultCfg(path string) *Config {
 	return &Config{
-		path:             path,
-		LaptopDisplay:    hypr.Monitor{},
-		ExternalDisplays: map[string]hypr.Monitor{},
+		path:     path,
+		Profiles: []Profile{},
 	}
 }
 
@@ -46,14 +57,6 @@ func InitConfig(path string) (*Config, error) {
 	return readConfig(path, true)
 }
 
-func (c *Config) Validate() error {
-	if c.LaptopDisplay.Name == "" {
-		return errors.New("laptop display name not set")
-	}
-
-	return nil
-}
-
 func (c *Config) Path() string {
 	return c.path
 }
@@ -64,8 +67,9 @@ func (c *Config) Reload(maxRetries int) error {
 		return fmt.Errorf("reading config: %w", err)
 	}
 
-	c.LaptopDisplay = u.LaptopDisplay
-	c.ExternalDisplays = u.ExternalDisplays
+	if u.Profiles != nil {
+		c.Profiles = u.Profiles
+	}
 	return nil
 }
 
