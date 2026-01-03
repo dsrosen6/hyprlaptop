@@ -27,7 +27,7 @@ type (
 )
 
 func (a *app) getMatchingProfile() *profile {
-	lookup := newLabelLookup(a.cfg.Monitors, a.currentState.Monitors)
+	lookup := a.newLabelLookup()
 	var matched *profile
 	for _, p := range a.cfg.Profiles {
 		if a.profileMatchesState(p, lookup) {
