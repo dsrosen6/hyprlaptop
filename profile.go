@@ -26,6 +26,45 @@ type (
 	}
 )
 
+func (a *app) getMatchingProfile() *profile {
+	lm := a.matchMonitorsToLabels()
+	labels := make(map[string]bool)
+	for _, l := range lm {
+		labels[l.Label] = true
+	}
+
+	var matched *profile
+	for _, p := range a.profiles {
+		if a.profileMatchesState(p, labels) {
+			matched = p
+		}
+	}
+
+	return matched
+}
+
+func (a *app) profileMatchesState(p *profile, labels map[string]bool) bool {
+	if p.Conditions.LidState != nil {
+		if *p.Conditions.LidState != a.state.LidState {
+			return false
+		}
+	}
+
+	if p.Conditions.PowerState != nil {
+		if *p.Conditions.PowerState != a.state.PowerState {
+			return false
+		}
+	}
+
+	for _, requiredLabel := range p.Conditions.EnabledMonitors {
+		if !labels[requiredLabel] {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (a *app) validateAllProfiles() {
 	for _, p := range a.profiles {
 		a.validateProfile(p)

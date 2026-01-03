@@ -6,7 +6,7 @@ import (
 )
 
 type state struct {
-	Monitors   monitorMap
+	Monitors   []monitor
 	LidState   lidState
 	PowerState powerState
 }

@@ -54,8 +54,6 @@ type (
 	hyprSocketConn struct {
 		*net.UnixConn
 	}
-
-	monitorMap map[string]monitor
 )
 
 func newHyprctlClient() (*hyprClient, error) {
@@ -121,18 +119,13 @@ func (h *hyprClient) runCommand(args []string) ([]byte, error) {
 	return out, checkForErr(string(out))
 }
 
-func (h *hyprClient) listMonitors() (monitorMap, error) {
+func (h *hyprClient) listMonitors() ([]monitor, error) {
 	var monitors []monitor
 	if err := h.runCommandWithUnmarshal([]string{"monitors"}, &monitors); err != nil {
 		return nil, err
 	}
 
-	mm := make(monitorMap, len(monitors))
-	for _, m := range monitors {
-		mm[m.Name] = m
-	}
-
-	return mm, nil
+	return monitors, nil
 }
 
 func (h *hyprClient) enableOrUpdateMonitor(m monitor) error {

@@ -80,8 +80,13 @@ func run() error {
 	return app.listen(context.Background())
 }
 
-func (a *app) RunUpdater() error {
-	return nil
+func (a *app) RunUpdater() {
+	matched := a.getMatchingProfile()
+	if matched == nil {
+		slog.Info("no match found")
+		return
+	}
+	slog.Info("found profile match", "profile", matched.Name)
 }
 
 // listen starts hyprlaptop's listener, which handles hyprctl display add/remove events
@@ -146,10 +151,7 @@ func (a *app) listen(ctx context.Context) error {
 				continue
 			}
 
-			if err := a.RunUpdater(); err != nil {
-				slog.Error("running updater", "error", err)
-			}
-
+			a.RunUpdater()
 		case err := <-errc:
 			return fmt.Errorf("listener failed: %w", err)
 
