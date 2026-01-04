@@ -1,6 +1,6 @@
 module github.com/dsrosen6/hyprlaptop
 
-go 1.24.9
+go 1.25.5
 
 require (
 	github.com/fsnotify/fsnotify v1.9.0

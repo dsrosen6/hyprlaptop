@@ -59,28 +59,28 @@ func newListener(hs *hyprSocketConn, dc *dbus.Conn, cfgPath string) (*listener, 
 func (l *listener) listen(ctx context.Context, events chan<- listenerEvent) error {
 	errc := make(chan error, 1)
 	go func() {
-		slog.Info("listening for hyprland events")
+		slog.Debug("listening for hyprland events")
 		if err := l.listenHyprctl(ctx, events); err != nil {
 			errc <- fmt.Errorf("hyprland listener: %w", err)
 		}
 	}()
 
 	go func() {
-		slog.Info("listening for config changes")
+		slog.Debug("listening for config changes")
 		if err := l.listenConfigChanges(ctx, events); err != nil {
 			errc <- fmt.Errorf("config listener: %w", err)
 		}
 	}()
 
 	go func() {
-		slog.Info("listening for lid events")
+		slog.Debug("listening for lid events")
 		if err := l.listenLidEvents(ctx, events); err != nil {
 			errc <- fmt.Errorf("lid listener: %w", err)
 		}
 	}()
 
 	go func() {
-		slog.Info("listening for power events")
+		slog.Debug("listening for power events")
 		if err := l.listenPowerEvents(ctx, events); err != nil {
 			errc <- fmt.Errorf("power listener: %w", err)
 		}
@@ -96,14 +96,6 @@ func (l *listener) listen(ctx context.Context, events chan<- listenerEvent) erro
 
 // listenHyprctl listens for hyprctl events and sends an event if it is a monitor add or removal.
 func (l *listener) listenHyprctl(ctx context.Context, events chan<- listenerEvent) error {
-	// emit initial event so app queries monitors
-	select {
-	case events <- listenerEvent{Type: displayInitialEvent}:
-		slog.Info("sent initial display event")
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-
 	var lastEvent listenerEvent
 	scn := bufio.NewScanner(l.hctlSocketConn)
 	for scn.Scan() {
@@ -205,10 +197,10 @@ func (l *listener) listenConfigChanges(ctx context.Context, events chan<- listen
 }
 
 func (l *listener) listenLidEvents(ctx context.Context, events chan<- listenerEvent) error {
-	lidListener := newLidListener(l.dbusConn)
+	lidListener := newLidHandler(l.dbusConn)
 
 	go func() {
-		if err := lidListener.run(ctx); err != nil && err != context.Canceled {
+		if err := lidListener.listenForChanges(ctx); err != nil && err != context.Canceled {
 			slog.Error("lid listener stopped", "error", err)
 		}
 	}()
@@ -225,10 +217,10 @@ func (l *listener) listenLidEvents(ctx context.Context, events chan<- listenerEv
 }
 
 func (l *listener) listenPowerEvents(ctx context.Context, events chan<- listenerEvent) error {
-	powerListener := newPowerListener(l.dbusConn)
+	powerListener := newPowerHandler(l.dbusConn)
 
 	go func() {
-		if err := powerListener.run(ctx); err != nil && err != context.Canceled {
+		if err := powerListener.listenForChanges(ctx); err != nil && err != context.Canceled {
 			slog.Error("power listener stopped", "error", err)
 		}
 	}()

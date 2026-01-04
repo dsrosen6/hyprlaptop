@@ -9,6 +9,7 @@ type (
 		Name              string         `json:"name"`
 		Conditions        conditions     `json:"conditions"`
 		MonitorStates     []monitorState `json:"monitor_states"`
+		ExactMatch        bool           `json:"exact_match"`
 		DisableUndeclared bool           `json:"disable_undeclared_monitors"`
 		valid             bool
 	}
@@ -20,9 +21,9 @@ type (
 	}
 
 	monitorState struct {
-		Label    string  `json:"label"`
-		Disabled bool    `json:"disabled"`
-		Preset   *string `json:"preset"`
+		Label   string  `json:"label"`
+		Disable bool    `json:"disabled"`
+		Preset  *string `json:"preset"`
 	}
 )
 
@@ -56,6 +57,13 @@ func (a *app) profileMatchesState(p *profile, lookup labelLookup) bool {
 
 	for _, requiredLabel := range p.Conditions.EnabledMonitors {
 		if _, ok := lookup[requiredLabel]; !ok {
+			return false
+		}
+	}
+
+	// if exact match is required, ensure no extra monitors are connected
+	if p.ExactMatch {
+		if len(a.currentState.Monitors) != len(p.Conditions.EnabledMonitors) {
 			return false
 		}
 	}
@@ -102,7 +110,7 @@ func (a *app) validateProfile(p *profile) {
 		}
 
 		if s.Preset != nil {
-			if s.Disabled {
+			if s.Disable {
 				valid = false
 				pLog.Warn("invalid monitor state", "label", s.Label, "reason", "conflict: disabled set to true, but preset declared")
 				continue

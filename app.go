@@ -4,28 +4,36 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"reflect"
+	"time"
 
 	"github.com/godbus/dbus/v5"
 )
 
 type app struct {
-	hctl         *hyprClient
-	cfg          *config
-	listener     *listener
-	currentState *state
+	hctl          *hyprClient
+	cfg           *config
+	listener      *listener
+	currentState  *state
+	updating      bool
+	lastUpdateEnd time.Time
 }
 
-func newApp(cfg *config, hc *hyprClient, l *listener) *app {
+func newApp(cfg *config, hc *hyprClient, l *listener, s *state) *app {
 	return &app{
 		hctl:         hc,
 		cfg:          cfg,
 		listener:     l,
-		currentState: &state{},
+		currentState: s,
 	}
 }
 
 func run() error {
+	if os.Getenv("DEBUG") == "true" {
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+	}
+
 	cfg, err := initConfig("")
 	if err != nil {
 		return fmt.Errorf("initializing config: %w", err)
@@ -70,8 +78,16 @@ func run() error {
 		return fmt.Errorf("creating listener: %w", err)
 	}
 
-	app := newApp(cfg, h, l)
+	s, err := getInitialState(context.Background(), dc, h)
+	if err != nil {
+		return fmt.Errorf("getting initial state: %w", err)
+	}
+
+	app := newApp(cfg, h, l, s)
 	app.validateAllProfiles()
+
+	// initial updater run before starting listener
+	_ = app.runUpdater()
 
 	return app.listen(context.Background())
 }
@@ -86,6 +102,7 @@ func (a *app) listen(ctx context.Context) error {
 	errc := make(chan error, 1)
 
 	go func() {
+		slog.Info("listening for updates")
 		if err := a.listener.listen(ctx, events); err != nil {
 			errc <- err
 			cancel()
@@ -99,7 +116,7 @@ func (a *app) listen(ctx context.Context) error {
 				return nil // normal shutdown
 			}
 
-			slog.Info("received event from listener", "type", ev.Type, "details", ev.Details)
+			slog.Debug("received event from listener", "type", ev.Type, "details", ev.Details)
 			switch ev.Type {
 			case displayInitialEvent, displayAddEvent,
 				displayRemoveEvent, displayUnknownEvent:
@@ -110,16 +127,16 @@ func (a *app) listen(ctx context.Context) error {
 				}
 				if !reflect.DeepEqual(a.currentState.Monitors, m) {
 					a.currentState.Monitors = m
-					slog.Info("monitors state updated", "state", a.currentState.Monitors)
+					slog.Debug("monitors state updated", "state", a.currentState.Monitors)
 				}
 
 			case lidSwitchEvent:
 				a.currentState.LidState = parseLidState(ev.Details)
-				slog.Info("lid state updated", "state", a.currentState.LidState)
+				slog.Debug("lid state updated", "state", a.currentState.LidState)
 
 			case powerChangedEvent:
 				a.currentState.PowerState = parsePowerState(ev.Details)
-				slog.Info("power state updated", "state", a.currentState.PowerState)
+				slog.Debug("power state updated", "state", a.currentState.PowerState)
 
 			case configUpdatedEvent:
 				// Update config values
@@ -133,10 +150,16 @@ func (a *app) listen(ctx context.Context) error {
 			}
 
 			if !a.currentState.ready() {
+				slog.Debug("not ready; awaiting initial values")
 				continue
 			}
 
-			if err := a.update(); err != nil {
+			if a.updating || time.Since(a.lastUpdateEnd) < 500*time.Millisecond {
+				slog.Debug("skipping: in cooldown")
+				continue
+			}
+
+			if err := a.runUpdater(); err != nil {
 				slog.Error("running updater", "error", err)
 			}
 
@@ -149,77 +172,26 @@ func (a *app) listen(ctx context.Context) error {
 	}
 }
 
-func (a *app) update() error {
-	lookup := a.newLabelLookup()
-	matched := a.getMatchingProfile(lookup)
-	if matched == nil {
-		slog.Info("no match found")
-		return nil
-	}
-	slog.Info("found profile match", "profile", matched.Name)
-
-	params := a.updateParamsFromProfile(matched, lookup)
-	for _, u := range params.enable {
-		slog.Info("will update monitor", "name", u.Name, "desc", u.Description, "make", u.Make, "model", u.Model)
+func getInitialState(ctx context.Context, dc *dbus.Conn, hc *hyprClient) (*state, error) {
+	// TODO: theres gotta be a better way
+	ls, err := newLidHandler(dc).getCurrentState(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting lid status: %w", err)
 	}
 
-	for _, d := range params.disable {
-		slog.Info("will disable monitor", "name", d.Name, "desc", d.Description, "make", d.Make, "model", d.Model)
-	}
-	return nil
-}
-
-func (a *app) updateParamsFromProfile(p *profile, lookup labelLookup) *monitorUpdateParams {
-	var toUpdate, toDisable []monitor
-	seenNames := make(map[string]bool)
-
-	for _, s := range p.MonitorStates {
-		lm, ok := lookup[s.Label]
-		if !ok {
-			// only warn if not disabled; if it's marked disabled but missing,
-			// mission is already accomplished
-			if !s.Disabled {
-				slog.Warn("update param builder: no monitor found for label", "label", s.Label)
-				continue
-			}
-			slog.Debug("update param builder: no monitor found for label, but marked for disable, no action needed", "label", s.Label)
-			continue
-		}
-
-		seenNames[lm.Monitor.Name] = true
-
-		if s.Disabled {
-			toDisable = append(toDisable, lm.Monitor)
-			continue
-		}
-
-		if s.Preset == nil {
-			// no preset provided, just assume it stays the same
-			toUpdate = append(toUpdate, lm.Monitor)
-			continue
-		}
-
-		pr, ok := a.cfg.Monitors[s.Label].Presets[*s.Preset]
-		if !ok {
-			slog.Warn("update param builder: provided preset doesn't exist", "preset", s.Preset)
-			continue
-		}
-
-		m := monitor{
-			monitorIdentifiers: lm.Monitor.monitorIdentifiers,
-			monitorSettings:    pr,
-		}
-
-		toUpdate = append(toUpdate, m)
+	ps, err := newPowerHandler(dc).getCurrentState(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting power status: %w", err)
 	}
 
-	if p.DisableUndeclared {
-		for _, m := range a.currentState.Monitors {
-			if !seenNames[m.Name] {
-				toDisable = append(toDisable, m)
-			}
-		}
+	m, err := hc.listMonitors()
+	if err != nil {
+		return nil, fmt.Errorf("listing monitors: %w", err)
 	}
 
-	return newMonitorUpdateParams(toUpdate, toDisable)
+	return &state{
+		LidState:   ls,
+		PowerState: ps,
+		Monitors:   m,
+	}, nil
 }

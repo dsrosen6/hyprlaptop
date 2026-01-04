@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 const (
@@ -38,8 +40,6 @@ type (
 	monitorIdentifiers struct {
 		Name        string `json:"name,omitempty"`
 		Description string `json:"description,omitempty"`
-		Make        string `json:"make,omitempty"`
-		Model       string `json:"model,omitempty"`
 	}
 
 	monitorSettings struct {
@@ -52,8 +52,9 @@ type (
 	}
 
 	monitorUpdateParams struct {
-		enable  []monitor
-		disable []monitor
+		enableOrUpdate []monitor
+		disable        []monitor
+		noChanges      []monitor
 	}
 
 	hyprSocketConn struct {
@@ -91,7 +92,7 @@ func newHyprSocketConn() (*hyprSocketConn, error) {
 	return &hyprSocketConn{conn}, nil
 }
 
-func newMonitorUpdateParams(enable, disable []monitor) *monitorUpdateParams {
+func newMonitorUpdateParams(enable, disable, noChanges []monitor) *monitorUpdateParams {
 	if enable == nil {
 		enable = []monitor{}
 	}
@@ -101,8 +102,9 @@ func newMonitorUpdateParams(enable, disable []monitor) *monitorUpdateParams {
 	}
 
 	return &monitorUpdateParams{
-		enable:  enable,
-		disable: disable,
+		enableOrUpdate: enable,
+		disable:        disable,
+		noChanges:      noChanges,
 	}
 }
 
@@ -148,6 +150,51 @@ func (h *hyprClient) listMonitors() ([]monitor, error) {
 	return monitors, nil
 }
 
+func (h *hyprClient) bulkUpdateMonitors(p *monitorUpdateParams) error {
+	if p == nil {
+		return errors.New("receieved nil params")
+	}
+
+	tm := len(p.enableOrUpdate) + len(p.disable)
+	errch := make(chan error, tm)
+
+	var wg sync.WaitGroup
+	for _, m := range p.enableOrUpdate {
+		wg.Go(func() {
+			if err := h.enableOrUpdateMonitor(m); err != nil {
+				errch <- fmt.Errorf("enabling monitor %s: %w", m.Name, err)
+			}
+			slog.Debug("bulkUpdateMonitors: display enabled or updated", "name", m.Name)
+		})
+	}
+
+	for _, m := range p.disable {
+		wg.Go(func() {
+			if err := h.disableMonitor(m); err != nil {
+				errch <- fmt.Errorf("disabling monitor %s: %w", m.Name, err)
+			}
+			slog.Debug("bulkUpdateMonitors: display disabled", "name", m.Name)
+		})
+	}
+
+	go func() {
+		wg.Wait()
+		close(errch)
+	}()
+
+	hasErr := false
+	for err := range errch {
+		hasErr = true
+		slog.Error("bulkUpdateMonitors", "error", err)
+	}
+
+	if hasErr {
+		return errors.New("one or more update failed; see logs")
+	}
+
+	return nil
+}
+
 func (h *hyprClient) enableOrUpdateMonitor(m monitor) error {
 	args := []string{"keyword", "monitor", monitorToConfigString(m)}
 	if _, err := h.runCommand(args); err != nil {
@@ -164,14 +211,6 @@ func (h *hyprClient) disableMonitor(m monitor) error {
 	}
 
 	return nil
-}
-
-func (p *monitorUpdateParams) addMonitorToEnable(m monitor) {
-	p.enable = append(p.enable, m)
-}
-
-func (p *monitorUpdateParams) addMonitorToDisable(m monitor) {
-	p.disable = append(p.disable, m)
 }
 
 func monitorToConfigString(m monitor) string {
