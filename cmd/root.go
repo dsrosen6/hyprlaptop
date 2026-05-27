@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 
 	"github.com/dsrosen6/hyprdocked/internal/app"
 	"github.com/spf13/cobra"
@@ -70,6 +71,18 @@ var (
 			cobra.CheckErr(app.RunListener(c))
 		},
 	}
+
+	lockCmd = &cobra.Command{
+		Use:   "lock",
+		Short: "Run the configured lock command",
+		Run: func(cmd *cobra.Command, args []string) {
+			lockCmd := viper.GetString("lock-cmd")
+			if lockCmd == "" {
+				lockCmd = app.DefaultLockCmd
+			}
+			cobra.CheckErr(exec.Command("sh", "-c", lockCmd).Start())
+		},
+	}
 )
 
 func Execute() {
@@ -82,13 +95,21 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().BoolP("debug", "d", false, "enable debug logging")
 	rootCmd.PersistentFlags().StringP("laptop", "l", "eDP-1", "laptop monitor name")
-	rootCmd.PersistentFlags().Bool("suspend-idle", false, "suspend device when idle command is sent")
-	rootCmd.PersistentFlags().Bool("suspend-closed", false, "suspend device on lid closed if only laptop")
+	rootCmd.PersistentFlags().Bool("lock-on-idle", true, "run lock command when idle command is sent")
+	rootCmd.PersistentFlags().String("lock-cmd", "", "command to run for locking (default: \"pidof hyprlock || hyprlock\")")
+	rootCmd.PersistentFlags().Int("lock-delay", 0, "seconds to wait after lock command before continuing idle procedures (default 1)")
+	rootCmd.PersistentFlags().Int("suspend-delay", 0, "seconds to wait after enabling display before suspending (default 1)")
+	rootCmd.PersistentFlags().Bool("suspend-idle", true, "suspend device when idle command is sent")
+	rootCmd.PersistentFlags().Bool("suspend-closed", true, "suspend device on lid closed if only laptop")
 	rootCmd.PersistentFlags().Bool("sequential-hooks", false, "run post-hooks sequentially instead of concurrently")
-	rootCmd.PersistentFlags().Int("settle-window", 3, "seconds to wait after an event before processing (default 3)")
+	rootCmd.PersistentFlags().Int("settle-window", 1, "seconds to wait after an event before processing (default 1)")
 
 	_ = viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
 	_ = viper.BindPFlag("laptop", rootCmd.PersistentFlags().Lookup("laptop"))
+	_ = viper.BindPFlag("lock-on-idle", rootCmd.PersistentFlags().Lookup("lock-on-idle"))
+	_ = viper.BindPFlag("lock-cmd", rootCmd.PersistentFlags().Lookup("lock-cmd"))
+	_ = viper.BindPFlag("lock-delay", rootCmd.PersistentFlags().Lookup("lock-delay"))
+	_ = viper.BindPFlag("suspend-delay", rootCmd.PersistentFlags().Lookup("suspend-delay"))
 	_ = viper.BindPFlag("suspend-idle", rootCmd.PersistentFlags().Lookup("suspend-idle"))
 	_ = viper.BindPFlag("suspend-closed", rootCmd.PersistentFlags().Lookup("suspend-closed"))
 	_ = viper.BindPFlag("sequential-hooks", rootCmd.PersistentFlags().Lookup("sequential-hooks"))
@@ -102,4 +123,5 @@ func init() {
 	rootCmd.AddCommand(idleCmd)
 	rootCmd.AddCommand(resumeCmd)
 	rootCmd.AddCommand(listenCmd)
+	rootCmd.AddCommand(lockCmd)
 }

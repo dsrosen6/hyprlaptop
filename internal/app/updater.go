@@ -3,6 +3,7 @@ package app
 import (
 	"log/slog"
 	"os/exec"
+	"time"
 )
 
 func (a *App) runUpdater() (bool, error) {
@@ -32,23 +33,18 @@ func (a *App) runUpdater() (bool, error) {
 		}
 
 	case statusOnlyLaptopClosed:
-		changed := false
-		switch a.laptopIsEnabled() {
-		case true:
-			lg.Debug("[UPDATER]laptop display already enabled; no display action needed")
-		case false:
-			lg.Info("[UPDATER]enabling laptop display")
-			if err := a.hctl.EnableOrUpdateMonitor(a.laptopDisplay); err != nil {
-				lg.Error("[UPDATER]issue enabling laptop display", "error", err)
-			}
-			changed = true
-		}
-
 		if a.Config.SuspendClosed {
 			lg.Info("[UPDATER]suspending machine")
-			return changed, systemctlSuspend()
+			return a.handleIdleCmd()
 		}
-		return changed, nil
+
+		switch a.laptopIsEnabled() {
+		case true:
+			lg.Debug("[UPDATER]laptop display already enabled; no action needed")
+		case false:
+			lg.Info("[UPDATER]enabling laptop display")
+			return true, a.hctl.EnableOrUpdateMonitor(a.laptopDisplay)
+		}
 
 	case statusDockedClosed:
 		switch a.laptopIsEnabled() {
@@ -66,6 +62,22 @@ func (a *App) runUpdater() (bool, error) {
 }
 
 func (a *App) handleIdleCmd() (bool, error) {
+	if a.Config.LockOnIdle {
+		lockCmd := a.Config.LockCmd
+		if lockCmd == "" {
+			lockCmd = DefaultLockCmd
+		}
+		lockDelay := a.Config.LockDelay
+		if lockDelay <= 0 {
+			lockDelay = defaultLockDelay
+		}
+		slog.Info("[UPDATER/IDLE CMD]running lock command", "command", lockCmd)
+		if err := exec.Command("sh", "-c", lockCmd).Start(); err != nil {
+			slog.Error("[UPDATER/IDLE CMD]issue running lock command", "error", err)
+		}
+		time.Sleep(time.Duration(lockDelay) * time.Second)
+	}
+
 	changed := false
 	if !a.laptopIsEnabled() {
 		slog.Info("[UPDATER/IDLE CMD]enabling laptop display")
@@ -78,6 +90,11 @@ func (a *App) handleIdleCmd() (bool, error) {
 	}
 
 	if a.Config.SuspendIdle {
+		sd := a.Config.SuspendDelay
+		if sd <= 0 {
+			sd = defaultSuspendDelay
+		}
+		time.Sleep(time.Duration(sd) * time.Second)
 		slog.Info("[UPDATER/IDLE CMD]suspending on idle enabled; suspending")
 		return changed, systemctlSuspend()
 	}

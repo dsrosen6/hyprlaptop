@@ -8,143 +8,157 @@
 
 - Displays being added or removed (via [Hyprland's IPC](https://wiki.hypr.land/IPC/))
 - Laptop lid events (when it is opened or closed)
-- Laptop power events (changes in AC or battery state)
-- `hyprdocked suspend` or `hyprdocked wake` events (keep reading for details on this)
+- `hyprdocked idle` or `hyprdocked resume` events (keep reading for details on this)
 
 Any time one of the above events are received, `hyprdocked` applies settings based on the following statuses if changes are needed.
 
 The laptop display is *enabled* if the following statuses are detected:
 
 - Docked with lid opened
-- Laptop only (any lid status)
+- Laptop only, lid opened
 
 The laptop display is *disabled* if the device is detected as docked with lid closed.
 
-### Special Case: `hyprdocked suspend`
+By default, closing the lid in laptop-only mode triggers the same lock and suspend sequence as `hyprdocked idle`.
 
-If the command `hyprdocked suspend` is called, the laptop display is enabled (regardless of the above statuses) and is kept that way until `hyprdocked wake` is called to release it.
+### Special Case: `hyprdocked idle` / `hyprdocked resume`
 
-The reason for this is because otherwise, when Hyprland is suspended, it is in whatever state it was last in until it wakes back up.
+If `hyprdocked idle` is called (typically by your idle daemon), `hyprdocked` will:
 
-Why? If your laptop is suspended (and presumably locked) while docked (manually or via an idle agent) and then unplugged from the dock, then you're opening up your laptop but the laptop display is still disabled. And since you now have zero displays enabled, you get the dreaded "oopsie daisy" screen on Hyprland.
+1. Run your lock command
+2. Enable the laptop display so it is ready when the device wakes back up
+3. Suspend the device
 
-This needs some manual wiring, because `hyprdocked` does not assume which idle utility you use. See the `Idle Daemon` section in configuration.
+The display stays enabled until `hyprdocked resume` is called, which releases this state and lets normal dock/lid logic take over again.
+
+Why? If your laptop suspends while docked (lid closed) and you then unplug from the dock and open the lid, the laptop display is still disabled. With zero displays active, Hyprland shows its blank-screen fallback. Routing suspend through `hyprdocked idle` prevents this.
+
+This needs some manual wiring because `hyprdocked` does not assume which idle utility you use. See the [Idle Daemon](#idle-daemon) section.
 
 ## Installation
 
+> **Requires Hyprland v0.55 or newer.** `hyprdocked` uses `hyprctl eval` with Lua to manage monitors, which was introduced in v0.55.
+
 ### From Source
 
-Just run `go install github.com/dsrosen6/hyprdocked@latest` and then move to configuration.
-
-### NixOS (Home Manager)
-
-In your `flake.nix`:
-
-```nix
-# The beginning of your flake...
-
-inputs = {
-    hyprdocked.url = "github:dsrosen6/hyprdocked";
-    # your other inputs...
-};
-
-outputs = {
-    hyprdocked,
-    # your other outputs...
-    ...
-};
-
-# the rest of your flake...
 ```
-
-In your `home.nix`, or wherever you put it:  
-
-```nix
-{
-    inputs,
-    # other variables...
-    ...
-}:
-{
-    imports = [
-        inputs.hyprdocked.homeManagerModules.default
-        # your other imports...
-    ];
-
-    # Your stuff...
-
-    services.hyprdocked.enable = true;
-}
+go install github.com/dsrosen6/hyprdocked@latest
 ```
-
-You can skip "auto-run" in configuration.
 
 ## Configuration
 
-`hyprdocked` requires very minimal configuration on top of your existing Hyprland config:
-
 ### Auto-Run
 
-If you're running Hyprland with UWSM:
+The daemon is started via `hyprdocked listen`. Wire it up with a systemd user service or directly in your Hyprland config.
 
-1. Download the file `hyprdocked.service` from this repo
-2. Add the file to `~/.config/systemd/user/`
-3. Run `systemctl --user daemon-reload`
-4. Run `systemctl --user enable hyprdocked.service --now`
+**systemd (recommended for UWSM users):**
 
-Otherwise, you can add to your Hyprland config:
-`exec-once = hyprdocked`
+A `hyprdocked.service` unit file is included in the `systemd/` directory of this repo. Copy it to `~/.config/systemd/user/`, then enable it:
+
+```
+systemctl --user daemon-reload
+systemctl --user enable hyprdocked.service --now
+```
+
+**Hyprland config (v0.55+):**
+
+```lua
+hl.on("hyprland.start", function()
+    hl.exec_cmd("hyprdocked listen")
+end)
+```
 
 ### Identify Laptop Display
 
-Run `hyprctl monitors` and find your laptop display. If it is anything like eDP-1, eDP1, you can just skip to the next section. To know if this applies to yours, just turn the name into full lowercase and remove the dash. If it is `edp1`, you're good.
+Run `hyprctl monitors` and find your laptop display. The default assumed name is `eDP-1`. If yours is different, set `laptop` in your config file (see below).
 
-If it's not, set an environment variable of `LAPTOP_DISPLAY_NAME` with the value being whatever you found.
-
-*If you need to do this, raise an issue. I'm happy to add  it to the common auto-detected display names.*
+*If you need to add a common name, raise an issue — happy to expand the auto-detection list.*
 
 ### Hyprland Monitors
 
-Make sure your monitors in your Hyprland config are all set as enabled. This ensures that `hyprdocked` can properly capture the right settings on startup. ***At an absolute minimum, put your laptop display settings in your config.***
+Make sure all your monitors are configured and enabled in your Hyprland config. At minimum, your laptop display must be defined so `hyprdocked` can restore its settings.
 
-For example:
+**Hyprland v0.55+ (Lua):**
 
-```conf
-monitor = DP-1,3440x1440@174.96,0x0,1.0 # external
-monitor = eDP-1,1920x1200,3440x0,1.25 # laptop, required
+```lua
+hl.monitor({
+    output = "DP-1",
+    mode = "3440x1440@174.96",
+    position = "0x0",
+    scale = "1.0",
+})
+
+hl.monitor({
+    output = "eDP-1",
+    mode = "1920x1200",
+    position = "3440x480",
+    scale = "1.25",
+})
 ```
+
+### Config File
+
+The config file lives at `~/.config/hypr/hyprdocked.yaml`. All settings have sensible defaults and the file is entirely optional — only set what you need to change.
+
+```yaml
+laptop: eDP-1          # laptop display name
+settle-window: 1       # seconds to wait after an event before processing
+
+lock-on-idle: true     # run lock command when hyprdocked idle is called
+lock-cmd: ""           # lock command to run (default: "pidof hyprlock || hyprlock")
+lock-delay: 1          # seconds to wait after locking before continuing
+
+suspend-idle: true     # suspend device when hyprdocked idle is called
+suspend-closed: true   # suspend device on lid close in laptop-only mode
+suspend-delay: 1       # seconds to wait after enabling display before suspending
+
+sequential-hooks: false  # run post-hooks one at a time instead of concurrently
+post-hooks: []
+```
+
+Run `hyprdocked check-cfg` to verify your config is being read correctly and see all active values.
+
+### Post-Hooks
+
+Post-hooks are shell commands that run after `hyprdocked` processes an event. Each hook has two fields:
+
+- `command` — the shell command to run
+- `on-status-change` — if `true`, only runs when the display actually changed state (e.g. laptop display was enabled or disabled). If `false` (the default), runs on every processed event.
+
+```yaml
+post-hooks:
+  - command: "notify-send 'display updated'"
+    on-status-change: false
+  - command: "~/.config/hypr/scripts/reload-waybar.sh"
+    on-status-change: true
+```
+
+Hooks run concurrently by default. Set `sequential-hooks: true` to run them one at a time in order.
 
 ### Idle Daemon
 
-Assuming you're using `hypridle`, you need to do the following.
+If you're using `hypridle`, wire `hyprdocked idle` into your suspend timeout and `hyprdocked resume` into the after-sleep hook. Use `hyprdocked lock` to run your configured lock command directly without triggering suspend.
 
-1. Add `hyprdocked suspend` into your `before_sleep_cmd`.
-2. Add `hyprdocked wake` into your `after_sleep_cmd`.
-
-Here is an example of how my `hypridle` config looks:
-
-```conf
+```ini
 general {
-    before_sleep_cmd=sh -c 'loginctl lock-session && hyprdocked suspend'
-    after_sleep_cmd=hyprdocked wake
-    lock_cmd=pidof hyprlock || hyprlock
+    lock_cmd = hyprdocked lock
+    after_sleep_cmd = hyprdocked resume
 }
 
 listener {
-    # Suspend after 30 seconds if hyprlock is active. Good for manual
-    # locks and accidental wakes.
+    # If hyprlock is already active when the device wakes, suspend again quickly.
     timeout = 30
-    on-timeout = sh -c 'pidof hyprlock >/dev/null && systemctl suspend'
+    on-timeout = sh -c 'pidof hyprlock >/dev/null && hyprdocked idle'
 }
 
 listener {
-    on-timeout=loginctl lock-session
-    timeout=600
+    timeout = 540
+    on-timeout = hyprdocked lock
 }
 
 listener {
-    on-timeout=systemctl suspend
-    timeout=630
+    timeout = 600
+    on-timeout = hyprdocked idle
 }
 ```
 

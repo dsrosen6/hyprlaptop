@@ -38,7 +38,9 @@ func newApp(cfg Config, hc *hypr.Client, l *listener, s *state) *App {
 }
 
 func RunListener(c Config) error {
-	hypr.WaitForEnvs()
+	if err := hypr.CheckEnvs(); err != nil {
+		return fmt.Errorf("checking hyprland environment: %w", err)
+	}
 	if c.Laptop == "" {
 		return errors.New("laptop monitor name cannot be empty")
 	}

@@ -22,11 +22,30 @@ var checkCfgCmd = &cobra.Command{
 
 		sw := cfg.SettleWindow
 		if sw <= 0 {
-			sw = 3
+			sw = 1
+		}
+
+		lockCmd := cfg.LockCmd
+		if lockCmd == "" {
+			lockCmd = app.DefaultLockCmd + " (default)"
+		}
+
+		ld := cfg.LockDelay
+		if ld <= 0 {
+			ld = 1
 		}
 
 		fmt.Printf("%-25s %v\n", "Debug:", cfg.Debug)
 		fmt.Printf("%-25s %s\n", "Laptop:", cfg.Laptop)
+		fmt.Printf("%-25s %v\n", "Lock On Idle:", cfg.LockOnIdle)
+		fmt.Printf("%-25s %s\n", "Lock Command:", lockCmd)
+		fmt.Printf("%-25s %ds\n", "Lock Delay:", ld)
+
+		sd := cfg.SuspendDelay
+		if sd <= 0 {
+			sd = 1
+		}
+		fmt.Printf("%-25s %ds\n", "Suspend Delay:", sd)
 		fmt.Printf("%-25s %v\n", "Suspend On Idle:", cfg.SuspendIdle)
 		fmt.Printf("%-25s %v\n", "Suspend On Closed:", cfg.SuspendClosed)
 		fmt.Printf("%-25s %v\n", "Sequential Hooks:", cfg.SequentialHooks)

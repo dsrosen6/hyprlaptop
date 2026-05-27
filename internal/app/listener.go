@@ -3,6 +3,7 @@ package app
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -55,7 +56,7 @@ const (
 	pingCmdEvent        eventType = "PING_CMD"
 
 	cmdSockName         = "hyprdocked.sock"
-	defaultSettleWindow = 3
+	defaultSettleWindow = 1
 )
 
 func newListener(p listenerParams) (*listener, error) {
@@ -276,6 +277,9 @@ func (l *listener) listenHyprctl(ctx context.Context, events chan<- listenerEven
 		return fmt.Errorf("error scanning: %w", err)
 	}
 
+	if ctx.Err() == nil {
+		return errors.New("hyprland socket closed unexpectedly")
+	}
 	return nil
 }
 

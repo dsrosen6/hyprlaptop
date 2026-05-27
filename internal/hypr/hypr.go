@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 const (
@@ -57,18 +55,14 @@ func NewClient() (*Client, error) {
 	return &Client{binaryPath: bp}, nil
 }
 
-func WaitForEnvs() {
-	ready := func() bool {
-		runtime := os.Getenv(runtimeEnv)
-		sig := os.Getenv(sigEnv)
-		return runtime != "" && sig != ""
+func CheckEnvs() error {
+	if os.Getenv(runtimeEnv) == "" {
+		return fmt.Errorf("missing required environment variable: %s", runtimeEnv)
 	}
-
-	for !ready() {
-		slog.Info("hyprland env not yet loaded; waiting 1s")
-		time.Sleep(1 * time.Second)
+	if os.Getenv(sigEnv) == "" {
+		return fmt.Errorf("missing required environment variable: %s", sigEnv)
 	}
-	slog.Info("hyprland envs loaded")
+	return nil
 }
 
 func NewSocketConn() (*SocketConn, error) {
@@ -142,8 +136,8 @@ func (h *Client) ListMonitors() ([]Monitor, error) {
 }
 
 func (h *Client) EnableOrUpdateMonitor(m Monitor) error {
-	args := []string{"keyword", "monitor", MonitorToConfigString(m)}
-	if _, err := h.RunCmd(args); err != nil {
+	lua := fmt.Sprintf("hl.dispatch(hl.monitor(%s))", monitorLuaArgs(m, false))
+	if _, err := h.RunCmd([]string{"eval", lua}); err != nil {
 		return err
 	}
 
@@ -151,20 +145,24 @@ func (h *Client) EnableOrUpdateMonitor(m Monitor) error {
 }
 
 func (h *Client) DisableMonitor(m Monitor) error {
-	args := []string{"keyword", "monitor", m.Name + ",", "disable"}
-	if _, err := h.RunCmd(args); err != nil {
+	lua := fmt.Sprintf("hl.dispatch(hl.monitor(%s))", monitorLuaArgs(m, true))
+	if _, err := h.RunCmd([]string{"eval", lua}); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func MonitorToConfigString(m Monitor) string {
-	res := fmt.Sprintf("%dx%d", m.Width, m.Height)
-	res = fmt.Sprintf("%s@%f", res, m.RefreshRate)
-	xy := fmt.Sprintf("%dx%d", m.X, m.Y)
-	scale := fmt.Sprintf("%f", m.Scale)
-	return fmt.Sprintf("%s,%s,%s,%s", m.Name, res, xy, scale)
+func monitorLuaArgs(m Monitor, disabled bool) string {
+	mode := fmt.Sprintf("%dx%d@%g", m.Width, m.Height, m.RefreshRate)
+	position := fmt.Sprintf("%dx%d", m.X, m.Y)
+	scale := fmt.Sprintf("%g", m.Scale)
+	disabledVal := "false"
+	if disabled {
+		disabledVal = "true"
+	}
+	return fmt.Sprintf(`{output="%s",mode="%s",position="%s",scale="%s",disabled=%s}`,
+		m.Name, mode, position, scale, disabledVal)
 }
 
 func checkForErr(out string) error {

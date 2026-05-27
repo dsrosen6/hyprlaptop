@@ -118,7 +118,7 @@ func identifyLaptopDisplay(cfgName string, displays []hypr.Monitor) (hypr.Monito
 		trimmed := trimmedDisplayName(m.Name)
 		if slices.Contains(commonLaptopDisplays, trimmed) {
 			return m, nil
-		} else if cfgName != "" && trimmed == cfgName {
+		} else if cfgName != "" && trimmed == trimmedDisplayName(cfgName) {
 			return m, nil
 		}
 	}

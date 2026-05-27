@@ -1,0 +1,5 @@
+debug: true
+laptop: eDP-1
+settle-window: 2
+suspend-idle: true
+suspend-closed: true

@@ -8,11 +8,20 @@ import (
 	"github.com/spf13/viper"
 )
 
-const configReloadDelay = 100 * time.Millisecond
+const (
+	configReloadDelay  = 100 * time.Millisecond
+	DefaultLockCmd     = "pidof hyprlock || hyprlock"
+	defaultLockDelay   = 1
+	defaultSuspendDelay = 1
+)
 
 type Config struct {
 	Debug           bool       `mapstructure:"debug"`
 	Laptop          string     `mapstructure:"laptop"`
+	LockOnIdle      bool       `mapstructure:"lock-on-idle"`
+	LockCmd         string     `mapstructure:"lock-cmd"`
+	LockDelay       int        `mapstructure:"lock-delay"`
+	SuspendDelay    int        `mapstructure:"suspend-delay"`
 	SuspendIdle     bool       `mapstructure:"suspend-idle"`
 	SuspendClosed   bool       `mapstructure:"suspend-closed"`
 	PostUpdateHooks []PostHook `mapstructure:"post-hooks"`

@@ -1,4 +1,3 @@
-*.env
-*.DS_Store
-.idea
-result/*
+bin/
+# Added by goreleaser init:
+dist/
