@@ -39,10 +39,24 @@ This needs some manual wiring because `hyprdocked` does not assume which idle ut
 
 > **Requires Hyprland v0.55 or newer.** `hyprdocked` uses `hyprctl eval` with Lua to manage monitors, which was introduced in v0.55.
 
+### AUR
+
+```
+yay -S hyprdocked-bin
+```
+
+The service file is installed automatically. Skip to [Auto-Run](#auto-run).
+
 ### From Source
 
 ```
 go install github.com/dsrosen6/hyprdocked@latest
+```
+
+Then copy the service file from the repo to your user systemd directory:
+
+```
+cp systemd/hyprdocked.service ~/.config/systemd/user/
 ```
 
 ## Configuration
@@ -53,11 +67,8 @@ The daemon is started via `hyprdocked listen`. Wire it up with a systemd user se
 
 **systemd (recommended for UWSM users):**
 
-A `hyprdocked.service` unit file is included in the `systemd/` directory of this repo. Copy it to `~/.config/systemd/user/`, then enable it:
-
 ```
-systemctl --user daemon-reload
-systemctl --user enable hyprdocked.service --now
+systemctl --user enable hyprdocked --now
 ```
 
 **Hyprland config (v0.55+):**

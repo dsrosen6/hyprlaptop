@@ -11,9 +11,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-const (
-	version = "0.3.0"
-)
+var version = "dev"
 
 var (
 	rootCmd = &cobra.Command{
