@@ -115,6 +115,8 @@ The config file lives at `~/.config/hypr/hyprdocked.yaml`. All settings have sen
 laptop: eDP-1          # laptop display name
 settle-window: 1       # seconds to wait after an event before processing
 
+log-file: ""           # path to log file (default: stderr); env vars like $HOME are expanded
+
 lock-on-idle: true     # run lock command when hyprdocked idle is called
 lock-cmd: ""           # lock command to run (default: "pidof hyprlock || hyprlock")
 lock-delay: 1          # seconds to wait after locking before continuing

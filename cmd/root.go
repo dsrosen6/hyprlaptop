@@ -11,16 +11,30 @@ import (
 	"github.com/spf13/viper"
 )
 
+func buildLogger(debug bool, logFile string) *slog.Logger {
+	level := slog.LevelInfo
+	if debug {
+		level = slog.LevelDebug
+	}
+	opts := &slog.HandlerOptions{Level: level}
+
+	if logFile != "" {
+		logFile = os.ExpandEnv(logFile)
+		f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+		if err == nil {
+			return slog.New(slog.NewTextHandler(f, opts))
+		}
+	}
+	return slog.New(slog.NewTextHandler(os.Stderr, opts))
+}
+
 var version = "dev"
 
 var (
 	rootCmd = &cobra.Command{
 		Use: "hyprdocked",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			debug := viper.GetBool("debug")
-			if debug {
-				slog.SetLogLoggerLevel(slog.LevelDebug)
-			}
+			slog.SetDefault(buildLogger(viper.GetBool("debug"), viper.GetString("log-file")))
 		},
 	}
 
@@ -92,6 +106,7 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().BoolP("debug", "d", false, "enable debug logging")
+	rootCmd.PersistentFlags().String("log-file", "", "path to log file (default: stderr)")
 	rootCmd.PersistentFlags().StringP("laptop", "l", "eDP-1", "laptop monitor name")
 	rootCmd.PersistentFlags().Bool("lock-on-idle", true, "run lock command when idle command is sent")
 	rootCmd.PersistentFlags().String("lock-cmd", "", "command to run for locking (default: \"pidof hyprlock || hyprlock\")")
@@ -103,6 +118,7 @@ func init() {
 	rootCmd.PersistentFlags().Int("settle-window", 1, "seconds to wait after an event before processing (default 1)")
 
 	_ = viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
+	_ = viper.BindPFlag("log-file", rootCmd.PersistentFlags().Lookup("log-file"))
 	_ = viper.BindPFlag("laptop", rootCmd.PersistentFlags().Lookup("laptop"))
 	_ = viper.BindPFlag("lock-on-idle", rootCmd.PersistentFlags().Lookup("lock-on-idle"))
 	_ = viper.BindPFlag("lock-cmd", rootCmd.PersistentFlags().Lookup("lock-cmd"))
